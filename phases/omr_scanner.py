@@ -124,11 +124,13 @@ def measure_fill(bin_inv, cx, cy, r):
     return float(np.mean(bin_inv[y0:y1, x0:x1][mask] > 0))
 
 
-def check_page(input: OMRInputData, threshold=DEFAULT_THRESHOLD) -> tuple[list[int], bytes]:
-    with open(input.coords_json, encoding="utf-8") as f:
-        bubbles = json.load(f)
+def check_page(input: OMRInputData, threshold: float = DEFAULT_THRESHOLD) -> tuple[list[int], bytes]:
+    bubbles = input.coords_json
 
-    arr = np.frombuffer(input.scan_bytes, dtype=np.uint8)
+    # input.scan_bytes is base64-encoded bytes, decode to raw image bytes
+    image_bytes = base64.b64decode(input.scan_bytes)
+
+    arr = np.frombuffer(image_bytes, dtype=np.uint8)
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
