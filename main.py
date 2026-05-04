@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 import os
 from fastapi.middleware.cors import CORSMiddleware
 
-from phases import printing
+from phases import printing, omr_scanner
+import base64
 
 # Setup db stuff
 load_dotenv()
