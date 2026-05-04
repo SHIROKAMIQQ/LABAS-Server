@@ -282,3 +282,17 @@ async def tally(request: TallyRequest, db: Session = Depends(db_init)):
   else:
     return {"status": "Added all votes to the tally."}
     
+# This API is called by the PO with the base64-encoded scanned ballot image and the 
+# candidate-coordinate mapping of the ballot template from /get-ballot-template.
+# It returns the list of selected candidate_ids and the receipt image as base-64 encoded bytes.
+@app.post("/scan-ballot")
+async def scan_ballot(request: omr_scanner.OMRInputData):
+  try:
+    # returns the scanned candidate_ids and the receipt image (as bytes) to be displayed on the PrecinctOfficer's screen for verification before tallying
+    candidate_ids, receipt = omr_scanner.check_page(request)
+    return {
+      "candidate_ids": candidate_ids,
+      "receipt": base64.b64encode(receipt).decode("ascii"),
+    }
+  except Exception as e:
+    raise HTTPException(status_code=500, detail=str(e))
