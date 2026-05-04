@@ -1,14 +1,12 @@
 from __future__ import annotations
 from pydantic import BaseModel
-from typing import TypeDict
-import argparse
-import json
-import sys
+from typing import TypedDict
+import base64
 
 import cv2
 import numpy as np
 
-from constants import (
+from .print_constants import (
     PAGE_WIDTH, PAGE_HEIGHT,
     BUBBLE_RADIUS,
     MARKER_SIZE, MARKER_POSITIONS,
@@ -28,14 +26,14 @@ ALIGN_DPI = 200
 
 # Base Models
 
-class BubbleCoordinate(TypeDict):
+class BubbleCoordinate(TypedDict):
     candidate_id: int
     bubble_x_pt: float
     bubble_y_pt: float
     page: int
 
 class OMRInputData(BaseModel):
-    coords_json: BubbleCoordinate
+    coords_json: list[BubbleCoordinate]
     scan_bytes: bytes
 
 def detect_corners(gray):
