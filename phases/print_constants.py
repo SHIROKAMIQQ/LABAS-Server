@@ -1,4 +1,4 @@
-from reportlab.lib.units import inch, mm
+from reportlab.lib.units import mm, inch
 
 PAGE_SIZE = (8.5 * inch, 13 * inch)
 PAGE_WIDTH, PAGE_HEIGHT = PAGE_SIZE
