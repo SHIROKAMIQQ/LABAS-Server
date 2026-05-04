@@ -326,27 +326,43 @@ async def scan_ballot(websocket: WebSocket, device_id: str, component: Component
             ).model_dump())
             continue
           
-          img_bytestring: str = msg.payload
-          uin = device_to_voter[device_id]
-          ballot_template: list[BubbleCoordinate] = printing.get_ballot_template(uin, db)
-          omr_input: OMRInputData = OMRInputData(coords_json=ballot_template, scan_bytes=img_bytestring)
-          voted_candidates_ids, _ = check_page(omr_input)
+          # Wrap in try/except to catch any OMR processing errors
+          try:
+            img_bytestring: str = msg.payload
+            uin = device_to_voter[device_id]
+            ballot_template: list[BubbleCoordinate] = printing.get_ballot_template(uin, db)
+            omr_input: OMRInputData = OMRInputData(coords_json=ballot_template, scan_bytes=img_bytestring)
+            voted_candidates_ids, _ = check_page(omr_input)
 
-          voted_candidates = db.exec(
-            select(orm.Candidate)
-            .where(col(orm.Candidate.candidate_id).in_(voted_candidates_ids))
-          ).all()
+            voted_candidates = db.exec(
+              select(orm.Candidate)
+              .where(col(orm.Candidate.candidate_id).in_(voted_candidates_ids))
+            ).all()
 
-          def parse_voted_candidate(candidate: orm.Candidate):
-            return CandidateDisplay(candidate_id=candidate.candidate_id, first_name=candidate.first_name, middle_name=candidate.middle_name, last_name=candidate.last_name)
+            def parse_voted_candidate(candidate: orm.Candidate):
+              return CandidateDisplay(candidate_id=candidate.candidate_id, first_name=candidate.first_name, middle_name=candidate.middle_name, last_name=candidate.last_name)
 
-          voted_candidates_list = list(map(parse_voted_candidate, voted_candidates))
+            voted_candidates_list = list(map(parse_voted_candidate, voted_candidates))
 
-          pc_websocket = devices[device_id][Component.PC]
-          await pc_websocket.send_json(Message(
-            type=MessageType.CANDIDATES,
-            payload=[voted_candidate.model_dump_json() for voted_candidate in voted_candidates_list]
-          ).model_dump())
+            pc_websocket = devices[device_id][Component.PC]
+            await pc_websocket.send_json(Message(
+              type=MessageType.CANDIDATES,
+              payload=[voted_candidate.model_dump_json() for voted_candidate in voted_candidates_list]
+            ).model_dump())
+          except RuntimeError as e:
+            # OMR couldn't find corners or process the image
+            await websocket.send_json(Message(
+              type=MessageType.ERROR,
+              payload=f"Could not process ballot image: {str(e)}. Please retake the photo."
+            ).model_dump())
+        
+          except Exception as e:
+            # Catch any other OMR errors (cv2 errors, decode errors, etc.)
+            print(f"OMR error: {type(e).__name__}: {e}")
+            await websocket.send_json(Message(
+                type=MessageType.ERROR,
+                payload=f"Error processing ballot: {str(e)}. Please retake the photo."
+            ).model_dump())
 
   except WebSocketDisconnect:
     if device_id in devices and component in devices[device_id]:
