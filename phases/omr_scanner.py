@@ -70,51 +70,72 @@ def find_paper_quad(gray):
 
 
 def detect_corners(gray):
-    h, w = gray.shape
-    page_diag = (h * h + w * w) ** 0.5
-    min_area = (0.003 * page_diag) ** 2
-    max_area = (0.04 * page_diag) ** 2
+    h_img, w_img = gray.shape
 
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    _, binv = cv2.threshold(
-        blur, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
-    contours, _ = cv2.findContours(
-        binv, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    # Rectify the paper
+    paper_quad = find_paper_quad(gray)
+    paper_quad = order_corners(paper_quad)
 
-    corner_band = 0.25
-    bx, by = corner_band * w, corner_band * h
+    # Warp paper to canonical size
+    aspect = PAGE_HEIGHT_PT / PAGE_WIDTH_PT
+    target_w = 1000
+    target_h = int(target_w * aspect)
+    dst = np.array([[0, 0], [target_w, 0],
+                    [0, target_h], [target_w, target_h]], dtype=np.float32)
+    M_paper = cv2.getPerspectiveTransform(paper_quad, dst)
+    paper_img = cv2.warpPerspective(gray, M_paper, (target_w, target_h))
+
+    # Find markers in the rectified paper
+    blur = cv2.GaussianBlur(paper_img, (5, 5), 0)
+    binv = cv2.adaptiveThreshold(
+        blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY_INV, 31, 5)
+    binv = cv2.morphologyEx(binv, cv2.MORPH_CLOSE,
+                            np.ones((3, 3), np.uint8), iterations=1)
+    contours, _ = cv2.findContours(binv, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    page_area = target_w * target_h
+    min_area = page_area * 0.0003
+    max_area = page_area * 0.01
 
     candidates = []
     for c in contours:
         area = cv2.contourArea(c)
-        if area < min_area or area > max_area:
+        if not (min_area < area < max_area):
             continue
         x, y, bw, bh = cv2.boundingRect(c)
-        aspect = bw / float(bh) if bh else 0
-        if not (0.7 < aspect < 1.4):
+        aspect_c = bw / float(bh) if bh else 0
+        if not (0.7 < aspect_c < 1.4):
             continue
         if area / (bw * bh) < 0.75:
             continue
-        cx, cy = x + bw / 2, y + bh / 2
-        in_corner = ((cx < bx or cx > w - bx) and
-                     (cy < by or cy > h - by))
-        if not in_corner:
+        cx, cy = x + bw/2, y + bh/2
+        # Now markers ARE near image corners because paper is rectified
+        bx, by = 0.15 * target_w, 0.15 * target_h
+        if not ((cx < bx or cx > target_w - bx) and
+                (cy < by or cy > target_h - by)):
             continue
         candidates.append((cx, cy, area))
 
     if len(candidates) < 4:
-        raise RuntimeError(f"Found only {len(candidates)} corners.")
+        raise RuntimeError(f"Found only {len(candidates)} markers in rectified paper.")
 
-    image_corners = [(0, 0), (w, 0), (0, h), (w, h)]
-    chosen = []
-    used = set()
+    # Pick closest to each rectified-image corner
+    image_corners = [(0, 0), (target_w, 0), (0, target_h), (target_w, target_h)]
+    chosen, used = [], set()
     for ix, iy in image_corners:
-        ranked = sorted(candidates,
-                        key=lambda p: (p[0] - ix) ** 2 + (p[1] - iy) ** 2)
+        ranked = sorted(candidates, key=lambda p: (p[0]-ix)**2 + (p[1]-iy)**2)
         pick = next((p for p in ranked if (p[0], p[1]) not in used), ranked[0])
         used.add((pick[0], pick[1]))
         chosen.append((pick[0], pick[1]))
-    return np.array(chosen, dtype=np.float32)
+
+    # Map marker centers from rectified-paper space back to original image space
+    M_inv = np.linalg.inv(M_paper)
+    rectified = np.array([[cx, cy] for cx, cy in chosen], dtype=np.float32)
+    rectified_h = np.hstack([rectified, np.ones((4, 1), dtype=np.float32)])
+    original = (M_inv @ rectified_h.T).T
+    original = original[:, :2] / original[:, 2:3]
+    return original.astype(np.float32)
 
 
 def order_corners(pts):
