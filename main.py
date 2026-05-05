@@ -347,22 +347,14 @@ async def scan_ballot(websocket: WebSocket, device_id: str, component: Component
             pc_websocket = devices[device_id][Component.PC]
             await pc_websocket.send_json(Message(
               type=MessageType.CANDIDATES,
-              payload=[voted_candidate.model_dump_json() for voted_candidate in voted_candidates_list]
-            ).model_dump())
-          except RuntimeError as e:
-            # OMR couldn't find corners or process the image
-            await websocket.send_json(Message(
-              type=MessageType.ERROR,
-              payload=f"Could not process ballot image: {str(e)}. Please retake the photo."
+              payload=[voted_candidate.model_dump() for voted_candidate in voted_candidates_list],
             ).model_dump())
         
           except Exception as e:
-            # Catch any other OMR errors (cv2 errors, decode errors, etc.)
-            print(f"OMR error: {type(e).__name__}: {e}")
-            await websocket.send_json(Message(
-                type=MessageType.ERROR,
-                payload=f"Error processing ballot: {str(e)}. Please retake the photo."
-            ).model_dump())
+            # OMR failed (corners not found, blur, bad angle, etc.)
+            # Just log and skip — phone will send next frame
+            print(f"OMR failed (will retry on next frame): {type(e).__name__}: {e}")
+            continue
 
   except WebSocketDisconnect:
     if device_id in devices and component in devices[device_id]:
