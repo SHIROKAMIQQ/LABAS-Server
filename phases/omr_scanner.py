@@ -39,6 +39,36 @@ class OMRInputData(BaseModel):
     coords_json: list[BubbleCoordinate]
     scan_bytes: str
 
+# This function finds the paper by looking for the largest bright contour, then approximates it to a quadrilateral.
+def find_paper_quad(gray):
+    h, w = gray.shape
+    blur = cv2.GaussianBlur(gray, (7, 7), 0)
+
+    # Paper is bright, background is dark — threshold for bright.
+    # NOTE: to have better results, ensure background is dark.
+    _, binp = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
+    # Close gaps from text/markers inside the paper
+    binp = cv2.morphologyEx(binp, cv2.MORPH_CLOSE, np.ones((15, 15), np.uint8))
+    contours, _ = cv2.findContours(binp, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        raise RuntimeError("No paper contour found.")
+
+    paper = max(contours, key=cv2.contourArea)
+    if cv2.contourArea(paper) < 0.1 * h * w:
+        raise RuntimeError("Paper too small in frame.")
+
+    # Approximate to a quadrilateral
+    peri = cv2.arcLength(paper, True)
+    for eps in (0.02, 0.03, 0.04, 0.05):
+        approx = cv2.approxPolyDP(paper, eps * peri, True)
+        if len(approx) == 4:
+            return approx.reshape(4, 2).astype(np.float32)
+
+    # Fallback: minAreaRect
+    rect = cv2.minAreaRect(paper)
+    return cv2.boxPoints(rect).astype(np.float32)
+
+
 def detect_corners(gray):
     h, w = gray.shape
     page_diag = (h * h + w * w) ** 0.5
