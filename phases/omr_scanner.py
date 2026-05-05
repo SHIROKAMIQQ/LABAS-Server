@@ -25,7 +25,7 @@ MARKERS_PT = [(x + MARKER_SIZE / 2, y + MARKER_SIZE / 2)
               for (x, y) in MARKER_POSITIONS]
 
 DEFAULT_THRESHOLD = 0.4
-ALIGN_DPI = 200
+ALIGN_DPI = 100
 
 # Base Models
 
