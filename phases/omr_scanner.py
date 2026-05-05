@@ -193,7 +193,7 @@ def check_page(input: OMRInputData, threshold=DEFAULT_THRESHOLD) -> tuple[list[i
         cv2.circle(dbg, (int(cx), int(cy)), int(radius_px), color, 2)
 
     _, buf = cv2.imencode(".png", dbg)
-    # cv2.imwrite("debug.png", dbg)
+    cv2.imwrite("/opt/LABAS-Server/debug.png", dbg)
 
     return results, buf.tobytes()
 
