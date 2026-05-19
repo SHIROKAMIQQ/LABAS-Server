@@ -138,6 +138,20 @@ def check_page(input: OMRInputData, threshold=DEFAULT_THRESHOLD) -> tuple[list[i
     img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
+    # Check corners — they should be white (high value) in a normal scan
+    h, w = gray.shape
+    corner_sample = np.mean([
+        gray[0:50, 0:50],
+        gray[0:50, w-50:w],
+        gray[h-50:h, 0:50],
+        gray[h-50:h, w-50:w]
+    ])
+    if corner_sample < 127:
+        gray = cv2.bitwise_not(gray)
+
+    # DEBUG: save raw scan
+    # cv2.imwrite("/tmp/debug_raw.png", gray)
+
     markers = detect_corners(gray)
     warped, scale = align(img, markers)
     radius_px = BUBBLE_RADIUS_PT * scale

@@ -333,7 +333,7 @@ def build_ballot(ballot_data: BallotData, uin: str, db: Session) -> bytes:
         name="PositionInstruction",
         fontName="NotoSans",
         fontSize=8,
-        spaceAfter=3,
+        spaceAfter=2,
         alignment=TA_CENTER,
         textColor=colors.black,
     )
@@ -349,7 +349,7 @@ def build_ballot(ballot_data: BallotData, uin: str, db: Session) -> bytes:
 
         # candidates
         story.append(CandidateGrid(position.candidates, position.title, bubble_coords))
-        story.append(Spacer(1, 6 * mm))
+        story.append(Spacer(1, 4 * mm))
 
     doc.build(story)
 

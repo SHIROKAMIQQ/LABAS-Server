@@ -233,9 +233,19 @@ import subprocess
 VM_PORT = "6310"
 PRINTER = "Brother_MFC_T800W"
 
-@app.get("/print-ballot")
-async def print_ballot(province: str, city: str, uin: str, db: Session = Depends(db_init)):
+class PrintBallotRequest(BaseModel):
+    province: str
+    city: str
+    uin: str
+
+@app.post("/print-ballot")
+# async def print_ballot(province: str, city: str, uin: str, db: Session = Depends(db_init)):
+async def print_ballot(body: PrintBallotRequest, db: Session = Depends(db_init)):
   try:
+    province = body.province
+    city = body.city
+    uin = body.uin
+
     ballot_data = printing.get_ballot_data(db=db, province=province, city=city)
     pdf_content = printing.build_ballot(ballot_data=ballot_data, uin=uin, db=db)
 

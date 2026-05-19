@@ -107,3 +107,11 @@ def _kyc_auth_sdk(uin: str, dob: str) -> Dict:
         "demographics": decrypted_response,
         "photo": img_base64
     }   
+
+def test_kyc_auth():
+    try:
+        _kyc_auth_sdk("9039823146", "2004/10/27")
+        print("SUCCESS")
+    except Exception as e:
+        print("ERROR")
+        print(e)
